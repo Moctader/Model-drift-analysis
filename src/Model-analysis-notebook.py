@@ -640,16 +640,16 @@ def drift_monitoring():
 
 def main():
     try:
-        # all_data = pd.DataFrame()
-        # data= data_ingestion('EURUSD.FOREX')
-        # all_data = pd.concat([all_data, data], ignore_index=True)
+        all_data = pd.DataFrame()
+        data= data_ingestion('EURUSD.FOREX')
+        all_data = pd.concat([all_data, data], ignore_index=True)
 
-        # if not all_data.empty:
-        #     df=save_to_database(all_data)
+        if not all_data.empty:
+            df=save_to_database(all_data)
 
-        # data = fetch_data_from_database()
-        # data=process_data(data)
-        # save_processed_data_to_database(data)
+        data = fetch_data_from_database()
+        data=process_data(data)
+        save_processed_data_to_database(data)
         drift_monitoring()
      
 
