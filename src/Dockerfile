@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libssl-dev \
+    libpq-dev \
+    build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . /app
+
+CMD ["python", "01_data_feeder.py"]
+# CMD ["python", "01_data_feeder.py", "&&", "python", "02_data_preprocessing.py"]

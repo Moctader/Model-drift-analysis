@@ -1,0 +1,13 @@
+project: my_project
+registry: ./feast_repo/data/registry.db
+provider: local
+
+online_store:
+  type: cassandra
+  keyspace: data_engineering_key_space
+  host: localhost
+  port: 12001
+
+offline_store:
+  type: file
+  path: ./feast_repo/data

@@ -1,0 +1,11 @@
+# API DRIVERS
+fastapi
+uvicorn
+
+# KAFKA & CASSANDRA DRIVERS
+confluent-kafka
+cassandra-driver
+
+
+
+# pip install -r requirements.txt

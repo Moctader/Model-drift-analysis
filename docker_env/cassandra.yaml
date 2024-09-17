@@ -1,0 +1,7 @@
+# Batch size warning and failure thresholds
+batch_size_warn_threshold_in_kb: 10240  # 10 MB
+batch_size_fail_threshold_in_kb: 20480  # 20 MB
+listen_address: 127.0.0.1  # or the actual IP of your machine
+rpc_address: 0.0.0.0       # to allow remote connections
+tombstone_failure_threshold: 200000
+tombstone_warn_threshold: 1000

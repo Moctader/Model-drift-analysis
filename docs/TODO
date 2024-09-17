@@ -1,0 +1,11 @@
+CREATE CIRCULAR DEMO WITH WORKERS
+MAYBE ADD BACKEND TO DOCKER COMPOSE?
+
+------------------------------------------------------------
+------------------------------------------------------------
+------------------------------------------------------------
+
+CASSANDRA ENDPOINT
+    ADD DATA FETCHING ENDPOINT
+    MAYBE X TO Y INDEX?
+        cassandra/keyspace/table/

@@ -1,0 +1,157 @@
+######################################################################################################
+### SHARED KAFKA VARS
+######################################################################################################
+
+x-kafka_shared: &kafka_shared
+    image: confluentinc/cp-kafka:7.3.0
+    volumes:
+        - ./configs/kafka_scraper.yml:/usr/app/kafka_scraper.yml
+        - ./jars/jmx_prometheus_javaagent-0.17.2.jar:/usr/app/jmx_prometheus_javaagent.jar
+    depends_on:
+        - kafka_zookeeper
+
+x-kafka_env: &kafka_env
+    KAFKA_AUTO_CREATE_TOPICS_ENABLE: False
+    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+    KAFKA_ZOOKEEPER_CONNECT: kafka_zookeeper:2181
+    KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    KAFKA_JMX_OPTS: "-javaagent:/usr/app/jmx_prometheus_javaagent.jar=13000:/usr/app/kafka_scraper.yml"
+    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+    KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+######################################################################################################
+### SHARED CASSANDRA VARS
+######################################################################################################
+
+x-cassandra: &cassandra_shared
+    image: cassandra:4.1.0
+    expose:
+        - "7000" 
+        - "7001" 
+        - "7199" 
+        - "9142" 
+        - "9160"
+    volumes:
+        - ./configs/cassandra_scraper.yml:/usr/app/cassandra_scraper.yml
+        - ./jars/jmx_prometheus_javaagent-0.17.2.jar:/usr/app/jmx_prometheus_javaagent.jar
+    environment:
+        CASSANDRA_CLUSTER_NAME: MAILLEFER_SOLO
+        CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+        CASSANDRA_DC: DATACENTER1
+        JVM_OPTS: "-javaagent:/usr/app/jmx_prometheus_javaagent.jar=13000:/usr/app/cassandra_scraper.yml"
+
+        # COMMA SEPARATED LIST OF ALL YOUR CASSANDRA SERVICES
+        CASSANDRA_SEEDS: cassandra_1,cassandra_2
+
+services:
+
+######################################################################################################
+### KAFKA COORDINATOR
+######################################################################################################
+
+    kafka_zookeeper:
+        image: confluentinc/cp-zookeeper:7.3.0
+        environment:
+            ZOOKEEPER_SERVER_ID: 1
+            ZOOKEEPER_CLIENT_PORT: 2181
+            ZOOKEEPER_TICK_TIME: 2000
+            ZOOKEEPER_INIT_LIMIT: 5
+            ZOOKEEPER_SYNC_LIMIT: 2
+
+######################################################################################################
+### KAFKA BROKERS
+######################################################################################################
+
+    kafka_broker_1:
+        <<: *kafka_shared
+        ports:
+            - '11001:11001'
+            - '13000:13000'
+        environment:
+            <<: *kafka_env
+            KAFKA_BROKER_ID: 1
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka_broker_1:11000,PLAINTEXT_HOST://localhost:11001
+
+    kafka_broker_2:
+        <<: *kafka_shared
+        ports:
+            - '11002:11002'
+        environment:
+            <<: *kafka_env
+            KAFKA_BROKER_ID: 2
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka_broker_2:11000,PLAINTEXT_HOST://localhost:11002
+
+######################################################################################################
+### CASSANDRA BROKERS
+######################################################################################################
+
+    cassandra_1:
+        <<: *cassandra_shared
+        ports: 
+            - "12001:9042"
+
+    cassandra_2:
+        <<: *cassandra_shared
+        ports: 
+            - "12002:9042"
+
+# ######################################################################################################
+# ### FLINK COMPONENTS
+# ######################################################################################################
+
+#     jobmanager:
+#         image: apache/flink:1.17.1-java8
+#         command: jobmanager
+#         ports:
+#             - '8081:8081'
+#         volumes:
+#             - ./configs/flink_config.yml:/opt/flink/conf/flink-conf.yaml
+#             - ./jars/flink-metrics-prometheus-1.17.1.jar:/opt/flink/lib/flink-metrics.jar
+
+#     taskmanager_1:
+#         <<: *flink_taskmasters
+
+# ######################################################################################################
+# ### METRICS SCRAPING AND VISUALIZATION FRAMEWORKS
+# ######################################################################################################
+
+    # SCRAPING FRAMEWORK -- DEFAULT PORT 9090
+    prometheus:
+        image: prom/prometheus:v2.43.0
+        volumes:
+            - ./configs/prometheus_config.yml:/etc/prometheus/config.yml
+        ports:
+            - '9090:9090'
+        command:
+            - '--config.file=/etc/prometheus/config.yml'
+
+    # DATA PLOTTING -- DEFAULT PORT 3000
+    grafana:
+        image: grafana/grafana-oss:9.4.1
+        volumes:
+            - ./grafana/datasources:/etc/grafana/provisioning/datasources/
+            - ./grafana/dashboard_config.yml:/etc/grafana/provisioning/dashboards/main.yaml
+            - ./grafana/dashboards/:/var/lib/grafana/dashboards
+            - ./grafana/server.ini:/etc/grafana/grafana.ini
+        ports:
+            - '9091:3000'
+
+# ######################################################################################################
+# ### HARDWARE PERFORMANCE MONITORS (PROMETHEUS) FOR THE HOST MACHINE
+# ######################################################################################################
+
+    # GOOD HARDWARE INFORMATION
+    node-exporter:
+        image: prom/node-exporter:v1.6.0
+
+    # MORE SPECIFIC DOCKER INFO
+    # PARTICULARLY NETWORK TRACKING
+    cadvisor:
+        image: gcr.io/cadvisor/cadvisor
+        volumes:
+            - /:/rootfs:ro
+            - /var/run:/var/run:ro
+            - /sys:/sys:ro
+            - /var/lib/docker/:/var/lib/docker:ro
+            - /dev/disk:/dev/disk/:ro

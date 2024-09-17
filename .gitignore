@@ -1,0 +1,75 @@
+env/*
+/bootstrap/data
+/bootstrap/tmp
+/classes/
+/dist/
+/exploded-archives/
+/test-build/
+/test-output/
+/test-report/
+/target/
+temp-testng-customsuite.xml
+.mypy_cache
+.venv/
+venv/
+__pycache__/
+__pycache__
+.env
+api/.env
+src/models/
+src/models/financial_trading_model.pkl
+src/data/current/current_data.parquet
+src/data/reference/reference_data.parquet
+# based on http://stackoverflow.com/a/8865858/422476 I am removing inline comments
+
+#/classes/  		              all class files
+#/dist/                       contains generated war files for deployment
+#/exploded-archives/		      war content generation during deploy (or explode)
+#/test-build/                 test compilation (ant target for Seam)
+#/test-output/                test results
+#/test-report/                test report generation for, e.g., Hudson
+#/target/                     maven output folder
+#temp-testng-customsuite.xml	generated when running test cases under Eclipse
+
+# Thanks to @VonC and @kraftan for their helpful answers on a related question
+# on StackOverflow.com:
+# http://stackoverflow.com/questions/4176687
+# /what-is-the-recommended-source-control-ignore-pattern-for-seam-projects
+
+
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/frontend/node_modules
+/frontend/.pnp
+/frontend/.pnp.js
+/frontend/.yarn/install-state.gz
+
+# testing
+/frontend/coverage
+
+# next.js
+/frontend/.next/
+/frontend/out/
+
+# production
+/frontend/build
+
+# misc
+/frontend/.DS_Store
+/frontend/*.pem
+
+# debug
+/frontend/npm-debug.log*
+/frontend/yarn-debug.log*
+/frontend/yarn-error.log*
+
+# local env files
+/frontend/.env*.local
+
+# vercel
+/frontend/.vercel
+
+# typescript
+/frontend/*.tsbuildinfo
+/frontend/next-env.d.ts
