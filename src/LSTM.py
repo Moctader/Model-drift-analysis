@@ -86,53 +86,63 @@ def update_model_results_to_database(
 
 
 def train_model(data: pd.DataFrame):
-    # Feature extraction
-    X = data['returns'].values.reshape(-1, 1)
-    
-    # Define the target variable for classification
-    data['target'] = (data['close'].shift(-1) > data['close']).astype(int)
-    y = data['target'].values[:-1]  # Remove the last value which will be NaN due to shift
-    X = X[:-1]  # Align X with y
+    try:
+        # Feature extraction: Reshaping 'returns' to use as input
+        X = data['returns'].values.reshape(-1, 1)
+        
+        # Define the target variable for classification (binary: 1 if next close > current close, else 0)
+        data['target'] = (data['close'].shift(-1) > data['close']).astype(int)
+        y = data['target'].values[:-1]  # Exclude the last row due to NaN from the shift
+        X = X[:-1]  # Align X with y
+        
+        # Impute missing values in X using median strategy
+        imputer = SimpleImputer(strategy='median')
+        X = imputer.fit_transform(X)
 
-    # Impute missing values in X
-    imputer = SimpleImputer(strategy='median')
-    X = imputer.fit_transform(X)
+        # Reshape X for LSTM input (samples, timesteps, features)
+        X = X.reshape((X.shape[0], 1, X.shape[1]))
 
-    # Reshape X for LSTM input (samples, timesteps, features)
-    X = X.reshape((X.shape[0], 1, X.shape[1]))
+        # Initialize and define the LSTM model
+        model = Sequential([
+            LSTM(50, activation='relu', input_shape=(1, X.shape[2])),
+            Dense(1, activation='sigmoid')
+        ])
 
-    # Initialize and train the LSTM model
-    model = Sequential()
-    model.add(LSTM(50, activation='relu', input_shape=(1, X.shape[2])))
-    model.add(Dense(1, activation='sigmoid'))
-    model.compile(optimizer=Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=['accuracy'])
-    model.fit(X, y, epochs=50, batch_size=32, verbose=1)
+        # Compile the model with binary cross-entropy loss and Adam optimizer
+        model.compile(optimizer=Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=['accuracy'])
 
-    # Evaluate the model
-    y_pred = (model.predict(X) > 0.5).astype("int32")
-    accuracy = accuracy_score(y, y_pred)
-    logger.info(f"Model trained with accuracy: {accuracy}")
+        # Train the model
+        model.fit(X, y, epochs=50, batch_size=32, verbose=1)
 
-    # Record initial model metadata
-    initial_record = {
-        'id': 1,
-        'datetime': pd.Timestamp.now().to_pydatetime(),
-        'model_name': "financial_trading_model",
-        'model_tag': "",
-        'score': float(accuracy),
-        'mse': 0.0,
-        'avg_mse': 0.0,
-        'total_return': 0.0,
-        'version': 1,
-    }
+        # Evaluate the model's performance
+        y_pred = (model.predict(X) > 0.5).astype("int32")
+        accuracy = accuracy_score(y, y_pred)
+        logger.info(f"Model trained with accuracy: {accuracy}")
 
-    if is_exists("classification_financial_trading_model"):
-        update_model_results_to_database(
-            "classification_financial_trading_model", score=float(accuracy))
-    else:
-        cassandra.insert('golam',
-                         'model_result', initial_record)
+        # Prepare initial model metadata for database insertion
+        initial_record = {
+            'id': 1,
+            'datetime': pd.Timestamp.now().to_pydatetime(),
+            'model_name': "financial_trading_model",
+            'model_tag': "",
+            'score': float(accuracy),
+            'mse': 0.0,
+            'avg_mse': 0.0,
+            'total_return': 0.0,
+            'version': 1,
+        }
 
+        # Check if model results already exist in the database
+        if is_exists("LSTM_financial_trading_model"):
+            # Update the existing model results with the new accuracy
+            update_model_results_to_database("LSTM_financial_trading_model", score=float(accuracy))
+        else:
+            # Insert the initial record into Cassandra
+            cassandra.insert('golam', 'model_result', initial_record)
+
+    except Exception as e:
+        logger.error(f"Error during model training: {e}")
+        raise
 
     return model
 
@@ -154,7 +164,7 @@ def evaluate_model(model, features: pd.DataFrame):
     mse = mean_squared_error(y, predictions)
     logger.info(f"Model evaluation completed with MSE: {mse}")
 
-    update_model_results_to_database("classification_classification_financial_trading_model", mse=mse)
+    update_model_results_to_database("LSTM_financial_trading_model", mse=mse)
 
 
 def validate_model(model, validation_data: pd.DataFrame):
@@ -180,26 +190,29 @@ def validate_model(model, validation_data: pd.DataFrame):
     logger.info(f"Model validation completed with average MSE: {avg_mse}")
 
     update_model_results_to_database(
-        "classification_classification_financial_trading_model", avg_mse=avg_mse)
+        "LSTM_financial_trading_model", avg_mse=avg_mse)
 
 
 def deploy_model(model):
     models_dir = 'models'
     os.makedirs(models_dir, exist_ok=True)
 
-    bento_svc = bentoml.sklearn.save_model("classification_classification_financial_trading_model", model)
+    # Save the Keras model using the correct BentoML method
+    bento_svc = bentoml.keras.save_model("LSTM_financial_trading_model", model)
     model_tag = str(bento_svc.tag)
 
+    # Replace the colon in the model tag (if any) to avoid file path issues
     model_tag = model_tag.replace(":", "_")
-    model_path = os.path.join(models_dir, 'classification_classification_financial_trading_model.pkl')
+    model_path = os.path.join(models_dir, 'LSTM_financial_trading_model.h5')
 
-    with open(model_path, 'wb') as f:
-        pickle.dump(model, f)
-
+    # Save the model manually (if needed for additional backups or formats)
+    model.save(model_path)
+    
     logger.info(f"Model saved manually to {model_path}")
     logger.info(f"Model deployment completed: {model_tag}")
 
     return model_tag
+
 
 
 def handle_pipeline_input_event(input_data: KAFKA_DICT, kafka_push: KAFKA_PUSH_FUNC):
@@ -216,7 +229,7 @@ def handle_pipeline_input_event(input_data: KAFKA_DICT, kafka_push: KAFKA_PUSH_F
         model_tag = deploy_model(model)
 
         update_model_results_to_database(
-            "classification_classification_financial_trading_model", model_tag="classification_classification_financial_trading_model")
+            "LSTM_financial_trading_model", model_tag="LSTM_financial_trading_model")
 
         kafka_push(config.output_pipeline_topic, {"model_tag": model_tag})
         logger.info("Data pushed to Kafka for model deployment successfully.")
