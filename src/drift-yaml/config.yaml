@@ -23,7 +23,7 @@ models:
 
 
 
-  - name: ModelB
+  - name: classification_classification_financial_trading_model
     type: classification
     parameters:
       param1: value1

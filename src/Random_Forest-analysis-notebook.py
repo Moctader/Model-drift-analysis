@@ -6,14 +6,11 @@ import logging
 import vectorbt as vbt
 from sklearn.impute import SimpleImputer
 import plotly.graph_objects as go
-from utils.cassandra_utils import CassandraInstance
 import matplotlib.pyplot as plt
 from cassandra.cluster import Cluster
 from cassandra.policies import DCAwareRoundRobinPolicy
 from cassandra.query import SimpleStatement
 import yaml
-import os
-import pandas as pd
 import json
 import time
 import asyncio
@@ -25,28 +22,14 @@ from utils.kafka_utils import create_producer
 from cassandra import ReadFailure
 from constants.constants import DATA_FEEDER_TOPIC, DATA_PREPROCESSING_TOPIC, CASSANDRA_KEYSPACE, RAW_DATA_TABLE, VERSION_TYPE_HISTORY_DATA, VERSIONS_TABLE
 from utils.types import DICT_NAMESPACE
-import os
-import logging
-import json
-import time
-import pandas as pd
-import requests
-from utils.types import DICT_NAMESPACE
-from utils.kafka_utils import create_producer
-from utils.cassandra_utils import CassandraInstance
-from dotenv import load_dotenv
-from typing import Dict, List, Text
+from typing import Dict, List, Text, Tuple
 from evidently import ColumnMapping
 from evidently.metric_preset import DataDriftPreset
-from evidently.metrics import DatasetSummaryMetric
+from evidently.metrics import DatasetSummaryMetric, ColumnDriftMetric, RegressionQualityMetric
 from evidently.report import Report
-from evidently.metrics import ColumnDriftMetric
-from evidently.metrics import RegressionQualityMetric
 import random
-import datetime
-from typing import Dict, Tuple
-from model_training import train_model, is_exists, update_model_results_to_database, deploy_model
-
+from src.Linear_regression import train_model, is_exists, update_model_results_to_database, deploy_model
+from Random_Forest import train_model, deploy_model, is_exists, update_model_results_to_database
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -227,7 +210,7 @@ def prepare_reference_dataset(df: pd.DataFrame):
    
     # Prepare scoring data for reference and current data
     reference_scoring_data = reference_data[features]
-    reference_target_data = reference_data[target_col]
+    #reference_target_data = reference_data[target_col]
     
     model = joblib.load("models/financial_trading_model.pkl")
     reference_data[prediction_col] = model.predict(reference_scoring_data)
@@ -640,16 +623,16 @@ def drift_monitoring():
 
 def main():
     try:
-        all_data = pd.DataFrame()
-        data= data_ingestion('EURUSD.FOREX')
-        all_data = pd.concat([all_data, data], ignore_index=True)
+        # all_data = pd.DataFrame()
+        # data= data_ingestion('EURUSD.FOREX')
+        # all_data = pd.concat([all_data, data], ignore_index=True)
 
-        if not all_data.empty:
-            df=save_to_database(all_data)
+        # if not all_data.empty:
+        #     df=save_to_database(all_data)
 
-        data = fetch_data_from_database()
-        data=process_data(data)
-        save_processed_data_to_database(data)
+        # data = fetch_data_from_database()
+        # data=process_data(data)
+        # save_processed_data_to_database(data)
         drift_monitoring()
      
 

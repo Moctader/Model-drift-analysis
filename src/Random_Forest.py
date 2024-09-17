@@ -1,3 +1,4 @@
+#classify whether the stock price will go up or down based on historical data
 import logging
 import pandas as pd
 import numpy as np
@@ -12,6 +13,14 @@ import utils.kafka_clients as kafka_clients
 from utils.types import DICT_NAMESPACE, KAFKA_DICT, KAFKA_PUSH_FUNC
 from utils.cassandra_utils import CassandraInstance
 from typing import Optional
+import pandas as pd
+import numpy as np
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import accuracy_score
+import logging
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import accuracy_score
 
 config = DICT_NAMESPACE({
     'input_pipeline_topic': 'model_training',
@@ -58,7 +67,7 @@ def update_model_results_to_database(
 
     if data:
         conditions = {'id': 1}
-        cassandra.update('model_training_development',
+        cassandra.update('golam',
                          'model_result', data, conditions)
         logger.info(
             (
@@ -69,34 +78,45 @@ def update_model_results_to_database(
 
 
 def train_model(data: pd.DataFrame):
+    # Feature extraction
     X = data['returns'].values.reshape(-1, 1)
-    y = data['close'].values
+    
+    # Define the target variable for classification
+    data['target'] = (data['close'].shift(-1) > data['close']).astype(int)
+    y = data['target'].values[:-1]  # Remove the last value which will be NaN due to shift
+    X = X[:-1]  # Align X with y
 
+    # Impute missing values in X
     imputer = SimpleImputer(strategy='median')
-    y = imputer.fit_transform(y.reshape(-1, 1)).ravel()
+    X = imputer.fit_transform(X)
 
-    model = LinearRegression()
+    # Initialize and train the Random Forest classification model
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
     model.fit(X, y)
-    score = model.score(X, y)
-    logger.info(f"Model trained with score: {score}")
+    
+    # Evaluate the model
+    y_pred = model.predict(X)
+    accuracy = accuracy_score(y, y_pred)
+    logger.info(f"Model trained with accuracy: {accuracy}")
 
+    # Record initial model metadata
     initial_record = {
         'id': 1,
         'datetime': pd.Timestamp.now().to_pydatetime(),
         'model_name': "financial_trading_model",
         'model_tag': "",
-        'score': float(score),
+        'score': float(accuracy),
         'mse': 0.0,
         'avg_mse': 0.0,
         'total_return': 0.0,
         'version': 1,
     }
 
-    if is_exists("financial_trading_model"):
+    if is_exists("classification_financial_trading_model"):
         update_model_results_to_database(
-            "financial_trading_model", score=float(score))
+            "classification_financial_trading_model", score=float(accuracy))
     else:
-        cassandra.insert('model_training_development',
+        cassandra.insert('golam',
                          'model_result', initial_record)
 
     return model
@@ -119,7 +139,7 @@ def evaluate_model(model, features: pd.DataFrame):
     mse = mean_squared_error(y, predictions)
     logger.info(f"Model evaluation completed with MSE: {mse}")
 
-    update_model_results_to_database("financial_trading_model", mse=mse)
+    update_model_results_to_database("classification_classification_financial_trading_model", mse=mse)
 
 
 def validate_model(model, validation_data: pd.DataFrame):
@@ -145,18 +165,18 @@ def validate_model(model, validation_data: pd.DataFrame):
     logger.info(f"Model validation completed with average MSE: {avg_mse}")
 
     update_model_results_to_database(
-        "financial_trading_model", avg_mse=avg_mse)
+        "classification_classification_financial_trading_model", avg_mse=avg_mse)
 
 
 def deploy_model(model):
     models_dir = 'models'
     os.makedirs(models_dir, exist_ok=True)
 
-    bento_svc = bentoml.sklearn.save_model("financial_trading_model", model)
+    bento_svc = bentoml.sklearn.save_model("classification_classification_financial_trading_model", model)
     model_tag = str(bento_svc.tag)
 
     model_tag = model_tag.replace(":", "_")
-    model_path = os.path.join(models_dir, 'financial_trading_model.pkl')
+    model_path = os.path.join(models_dir, 'classification_classification_financial_trading_model.pkl')
 
     with open(model_path, 'wb') as f:
         pickle.dump(model, f)
@@ -181,7 +201,7 @@ def handle_pipeline_input_event(input_data: KAFKA_DICT, kafka_push: KAFKA_PUSH_F
         model_tag = deploy_model(model)
 
         update_model_results_to_database(
-            "financial_trading_model", model_tag="financial_trading_model")
+            "classification_classification_financial_trading_model", model_tag="classification_classification_financial_trading_model")
 
         kafka_push(config.output_pipeline_topic, {"model_tag": model_tag})
         logger.info("Data pushed to Kafka for model deployment successfully.")
