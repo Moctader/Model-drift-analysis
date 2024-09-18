@@ -11,6 +11,19 @@ from utils.kafka_utils import create_producer
 from cassandra import ReadFailure
 from constants.constants import DATA_FEEDER_TOPIC, DATA_PREPROCESSING_TOPIC, CASSANDRA_KEYSPACE, RAW_DATA_TABLE, VERSION_TYPE_HISTORY_DATA, VERSIONS_TABLE
 from utils.types import DICT_NAMESPACE
+from cassandra.cluster import Cluster
+from cassandra.policies import DCAwareRoundRobinPolicy
+
+
+# Connect to the Cassandra cluster
+cluster = Cluster(
+    contact_points=['193.166.180.240'],
+    port=12001,
+    load_balancing_policy=DCAwareRoundRobinPolicy(local_dc='DATACENTER1'),
+    protocol_version=4
+)
+session = cluster.connect()
+session.set_keyspace('data_engineering_key_space')
 
 load_dotenv()
 
@@ -318,3 +331,13 @@ except KeyboardInterrupt:
     print("Program interrupted and stopped.")
 finally:
     cassandra.instance.shutdown()
+
+# if __name__ == '__main__':
+#     print("Data feeder has started.")
+#     start_time = time.time()
+#     try:
+#         asyncio.run(ingest_historical_data())
+#         print(f"Data feeder has finished in {time.time() - start_time:.3f}s.")
+#         print("Data feeder completed successfully.")
+#     except Exception as e:
+#         print(f"Error during historical data ingestion: {e}")
